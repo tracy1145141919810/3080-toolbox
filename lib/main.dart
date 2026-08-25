@@ -51,9 +51,11 @@ Future<void> main(List<String> args) async {
   }
   runApp(
     Toolbox3080App(
-      initialPage: args.length == 1 && args.first == '--show-hardware'
-          ? ToolboxPage.hardwareDetection
-          : ToolboxPage.home,
+      initialPage: switch (args) {
+        ['--show-hardware'] => ToolboxPage.hardwareDetection,
+        ['--show-input-tester'] => ToolboxPage.inputTester,
+        _ => ToolboxPage.home,
+      },
     ),
   );
 }

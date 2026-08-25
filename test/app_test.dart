@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:toolbox_3080/main.dart';
@@ -10,6 +11,7 @@ import 'package:toolbox_3080/services/export_service.dart';
 import 'package:toolbox_3080/services/gif_export_service.dart';
 import 'package:toolbox_3080/services/hardware_detection_service.dart';
 import 'package:toolbox_3080/services/hardware_monitor_service.dart';
+import 'package:toolbox_3080/services/input_test_tracker.dart';
 import 'package:toolbox_3080/services/screen_capture_service.dart';
 import 'package:toolbox_3080/toolbox_shell.dart';
 
@@ -21,7 +23,7 @@ void main() {
 
     expect(find.text('3080工具箱'), findsOneWidget);
     expect(find.text('工具中心'), findsNWidgets(2));
-    expect(find.text('打开工具'), findsNWidgets(4));
+    expect(find.text('打开工具'), findsNWidgets(5));
 
     await tester.tap(find.widgetWithText(FilledButton, '打开工具').first);
     await tester.pumpAndSettle();
@@ -43,7 +45,7 @@ void main() {
 
     await tester.tap(find.text('工具中心').first);
     await tester.pumpAndSettle();
-    expect(find.text('打开工具'), findsNWidgets(4));
+    expect(find.text('打开工具'), findsNWidgets(5));
   });
 
   testWidgets('工具搜索和清除搜索可以工作', (tester) async {
@@ -57,7 +59,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(OutlinedButton, '清除搜索'));
     await tester.pump();
-    expect(find.text('打开工具'), findsNWidgets(4));
+    expect(find.text('打开工具'), findsNWidgets(5));
   });
 
   testWidgets('硬件检测独立页面识别 RTX 3080 并在首页显示专属评分', (tester) async {
@@ -227,6 +229,88 @@ void main() {
       find.widgetWithText(FilledButton, '导出 GIF'),
     );
     expect(export.onPressed, isNull);
+  });
+
+  test('键盘双击按两次独立触发统计且忽略自动连发', () {
+    final tracker = InputTestTracker(doubleTapThresholdMs: 300);
+    final first = tracker.keyboardDown(keyId: 65, timestampMs: 1000);
+    expect(first.accepted, isTrue);
+    expect(first.isDoubleTap, isFalse);
+    final repeat = tracker.keyboardDown(
+      keyId: 65,
+      timestampMs: 1050,
+      isRepeat: true,
+    );
+    expect(repeat.accepted, isFalse);
+    tracker.keyboardUp(65);
+
+    final second = tracker.keyboardDown(keyId: 65, timestampMs: 1240);
+    expect(second.isDoubleTap, isTrue);
+    expect(second.doubleTapCount, 1);
+    expect(tracker.keyboardDoubleTapTotal, 1);
+    tracker.keyboardUp(65);
+
+    final third = tracker.keyboardDown(keyId: 65, timestampMs: 2000);
+    tracker.keyboardUp(65);
+    final slowFourth = tracker.keyboardDown(keyId: 65, timestampMs: 2401);
+    expect(third.isDoubleTap, isFalse);
+    expect(slowFourth.isDoubleTap, isFalse);
+    expect(tracker.keyboardDoubleTapTotal, 1);
+  });
+
+  testWidgets('键鼠检测页直观标记104键并检测鼠标双击', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const Toolbox3080App());
+
+    await tester.tap(find.text('键鼠检测').first);
+    await tester.pumpAndSettle();
+    expect(find.text('全键盘键位检测'), findsOneWidget);
+    expect(find.text('未触发'), findsOneWidget);
+    expect(find.text('正在按下'), findsOneWidget);
+    expect(find.text('已经触发'), findsOneWidget);
+    expect(find.text('检测到双击'), findsOneWidget);
+    expect(find.text('0 / 104'), findsOneWidget);
+
+    final keyA = find.byKey(
+      ValueKey('keyboard-key-${LogicalKeyboardKey.keyA.keyId}'),
+    );
+    expect(keyA, findsOneWidget);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyA);
+    await tester.pump();
+    final pressed = tester.widget<AnimatedContainer>(keyA);
+    expect(
+      (pressed.decoration! as BoxDecoration).color,
+      const Color(0xFF2563EB),
+    );
+    expect(find.textContaining('按键已触发：A'), findsOneWidget);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyA);
+    await tester.pump();
+    final tested = tester.widget<AnimatedContainer>(keyA);
+    expect(
+      (tested.decoration! as BoxDecoration).color,
+      const Color(0xFFECFDF3),
+    );
+
+    final area = find.byKey(const ValueKey('mouse-test-area'));
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+    final center = tester.getCenter(area);
+    await tester.sendEventToBinding(mouse.hover(center));
+    await tester.sendEventToBinding(
+      mouse.down(center, buttons: kPrimaryMouseButton),
+    );
+    await tester.sendEventToBinding(mouse.up());
+    await tester.sendEventToBinding(
+      mouse.down(center, buttons: kPrimaryMouseButton),
+    );
+    await tester.sendEventToBinding(mouse.up());
+    await tester.pump();
+    expect(find.textContaining('检测到鼠标双击：鼠标左键'), findsOneWidget);
+
+    await tester.tap(find.text('重置测试'));
+    await tester.pump();
+    expect(find.text('0 / 104'), findsOneWidget);
+    expect(find.textContaining('测试记录已重置'), findsOneWidget);
   });
 
   test('JPEG 导出同时满足指定分辨率与文件大小上限', () {

@@ -1,5 +1,5 @@
 #define MyAppName "3080工具箱"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.5.0"
 #define MyAppExeName "toolbox_3080.exe"
 
 [Setup]

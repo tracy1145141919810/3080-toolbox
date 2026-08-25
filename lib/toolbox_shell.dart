@@ -4,6 +4,7 @@ import 'gif_recorder_screen.dart';
 import 'hardware_detection_screen.dart';
 import 'home_screen.dart';
 import 'image_converter_screen.dart';
+import 'input_tester_screen.dart';
 import 'services/hardware_detection_service.dart';
 import 'services/hardware_monitor_service.dart';
 
@@ -13,6 +14,7 @@ enum ToolboxPage {
   imageConverter,
   gifRecorder,
   hardwareDetection,
+  inputTester,
 }
 
 class ToolboxShell extends StatefulWidget {
@@ -78,6 +80,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
                           widget.hardwareTelemetryStreamFactory,
                       onDetected: _onHardwareDetected,
                     ),
+                    ToolboxPage.inputTester => const InputTesterScreen(),
                   },
                 ),
               ),
@@ -150,6 +153,11 @@ class _ToolboxShellState extends State<ToolboxShell> {
         '硬件检测 硬件信息 配置 cpu gpu 显卡 内存 主板 bios 磁盘 显示器 声卡 网卡 rtx3080'.contains(
           normalized,
         );
+    final inputMatches =
+        normalized.isEmpty ||
+        '键鼠检测 键盘检测 鼠标检测 全键盘 按键触发 双击 连击 侧键 滚轮 keyboard mouse'.contains(
+          normalized,
+        );
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -196,21 +204,33 @@ class _ToolboxShellState extends State<ToolboxShell> {
               ),
               const SizedBox(height: 26),
             ],
-            if (hardwareMatches) ...[
+            if (hardwareMatches || inputMatches) ...[
               Text(
                 '硬件工具',
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 14),
-              _HardwareDetectionToolCard(
-                onOpen: () => _open(ToolboxPage.hardwareDetection),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  if (hardwareMatches)
+                    _HardwareDetectionToolCard(
+                      onOpen: () => _open(ToolboxPage.hardwareDetection),
+                    ),
+                  if (inputMatches)
+                    _InputTesterToolCard(
+                      onOpen: () => _open(ToolboxPage.inputTester),
+                    ),
+                ],
               ),
             ],
             if (!portraitMatches &&
                 !converterMatches &&
                 !gifMatches &&
-                !hardwareMatches)
+                !hardwareMatches &&
+                !inputMatches)
               _buildEmptySearch(),
           ],
         ),
@@ -306,13 +326,13 @@ class _OverviewBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  '集成 GPU 人像处理、格式转换、GIF 录屏与硬件检测，数据无需上传。',
+                  '集成 GPU 人像处理、格式转换、GIF 录屏、硬件与键鼠检测，数据无需上传。',
                   style: TextStyle(color: Color(0xFFDCE8FF), fontSize: 14),
                 ),
               ],
             ),
           ),
-          const _OverviewMetric(value: '4', label: '可用工具'),
+          const _OverviewMetric(value: '5', label: '可用工具'),
           const SizedBox(width: 28),
           if (showScore) ...[
             const _OverviewMetric(value: '114514分', label: '整机性能评分'),
@@ -448,6 +468,15 @@ class _ToolboxNavigation extends StatelessWidget {
               label: '硬件检测',
               selected: selected == ToolboxPage.hardwareDetection,
               onTap: () => onSelected(ToolboxPage.hardwareDetection),
+              compact: compact,
+            ),
+            const SizedBox(height: 4),
+            _NavigationItem(
+              icon: Icons.keyboard_alt_outlined,
+              selectedIcon: Icons.keyboard_alt_rounded,
+              label: '键鼠检测',
+              selected: selected == ToolboxPage.inputTester,
+              onTap: () => onSelected(ToolboxPage.inputTester),
               compact: compact,
             ),
             const Spacer(),
@@ -847,6 +876,85 @@ class _HardwareDetectionToolCard extends StatelessWidget {
                           _FeatureTag('CPU/GPU'),
                           _FeatureTag('磁盘/内存'),
                           _FeatureTag('本地只读'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                FilledButton(onPressed: onOpen, child: const Text('打开工具')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InputTesterToolCard extends StatelessWidget {
+  const _InputTesterToolCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 540,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E7EC)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(
+                    Icons.keyboard_alt_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '键鼠检测',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        '直观显示104键触发状态，检测键盘连击、鼠标五键、滚轮和双击。',
+                        style: TextStyle(
+                          color: Color(0xFF667085),
+                          height: 1.45,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          _FeatureTag('104键'),
+                          _FeatureTag('双击统计'),
+                          _FeatureTag('鼠标侧键'),
                         ],
                       ),
                     ],
