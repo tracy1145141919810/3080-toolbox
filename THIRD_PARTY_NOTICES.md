@@ -5,3 +5,4 @@
 - `heic_native` 及其 Windows 版 libheif/libde265/libpng/zlib 运行库用于 HEIC/HEIF 本地解码；MIT、LGPL、libpng 与 zlib 许可文本安装在 `licenses` 目录。
 - Flutter 及 Dart 依赖的许可信息可通过 Flutter 构建产物的许可清单查看。
 - ImageMagick 7.1.2-29 Q16 x64 便携运行时用于本地图片格式转换，依据 ImageMagick License 分发。完整 `LICENSE.txt`、`NOTICE.txt` 和运行时配置文件安装在 `imagemagick` 目录。
+- `flutter_zxing` 2.3.0 与其 ZXing-C++ 解码运行库用于本地二维码识别，分别依据 MIT 与 Apache-2.0 许可分发；许可文本安装在 `licenses` 目录。

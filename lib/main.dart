@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_zxing/flutter_zxing.dart' as zxing;
 import 'package:heic_native/heic_native.dart';
 import 'package:image/image.dart' as img;
 
@@ -11,6 +12,7 @@ import 'services/gif_export_service.dart';
 import 'services/hardware_detection_service.dart';
 import 'services/hardware_monitor_service.dart';
 import 'services/image_conversion_service.dart';
+import 'services/qr_scanner_service.dart';
 import 'services/screen_capture_service.dart';
 import 'services/yolo_segmentation_service.dart';
 import 'toolbox_shell.dart';
@@ -49,15 +51,61 @@ Future<void> main(List<String> args) async {
     await _runTelemetrySmokeTest(args[1]);
     return;
   }
+  if (args.length == 2 && args.first == '--qr-smoke-test') {
+    await _runQrSmokeTest(args[1]);
+    return;
+  }
   runApp(
     Toolbox3080App(
       initialPage: switch (args) {
         ['--show-hardware'] => ToolboxPage.hardwareDetection,
         ['--show-input-tester'] => ToolboxPage.inputTester,
+        ['--show-qr-scanner'] => ToolboxPage.qrScanner,
         _ => ToolboxPage.home,
       },
     ),
   );
+}
+
+Future<void> _runQrSmokeTest(String outputPath) async {
+  const expected = 'https://example.com/3080-toolbox-qr-smoke';
+  var status = 0;
+  try {
+    final encoded = zxing.zx.encodeBarcode(
+      contents: expected,
+      params: zxing.EncodeParams(
+        format: zxing.Format.qrCode,
+        width: 512,
+        height: 512,
+        margin: 16,
+        eccLevel: zxing.EccLevel.high,
+      ),
+    );
+    if (!encoded.isValid || encoded.data == null) {
+      throw StateError(encoded.error ?? '二维码测试图生成失败');
+    }
+    final png = zxing.pngFromBytes(encoded.data!, 512, 512);
+    await File(outputPath).writeAsBytes(png, flush: true);
+    final payload = await const QrScannerService().scanFile(outputPath);
+    if (!payload.results.any((result) => result.text == expected)) {
+      throw StateError('二维码解码结果与预期不一致');
+    }
+    await File('$outputPath.smoke.txt').writeAsString(
+      'results=${payload.results.length}\n'
+      'durationMs=${payload.durationMs}\n'
+      'text=${payload.results.first.text}\n',
+      flush: true,
+    );
+    stdout.writeln(
+      'QR_OK results=${payload.results.length} '
+      'durationMs=${payload.durationMs} text=${payload.results.first.text}',
+    );
+  } catch (error, stackTrace) {
+    stderr.writeln('QR_FAILED $error');
+    stderr.writeln(stackTrace);
+    status = 1;
+  }
+  exit(status);
 }
 
 Future<void> _runTelemetrySmokeTest(String outputPath) async {

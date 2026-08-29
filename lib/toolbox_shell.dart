@@ -5,6 +5,7 @@ import 'hardware_detection_screen.dart';
 import 'home_screen.dart';
 import 'image_converter_screen.dart';
 import 'input_tester_screen.dart';
+import 'qr_scanner_screen.dart';
 import 'services/hardware_detection_service.dart';
 import 'services/hardware_monitor_service.dart';
 
@@ -13,6 +14,7 @@ enum ToolboxPage {
   portraitBackground,
   imageConverter,
   gifRecorder,
+  qrScanner,
   hardwareDetection,
   inputTester,
 }
@@ -74,6 +76,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
                     ToolboxPage.portraitBackground => const HomeScreen(),
                     ToolboxPage.imageConverter => const ImageConverterScreen(),
                     ToolboxPage.gifRecorder => const GifRecorderScreen(),
+                    ToolboxPage.qrScanner => const QrScannerScreen(),
                     ToolboxPage.hardwareDetection => HardwareDetectionScreen(
                       loader: widget.hardwareLoader,
                       telemetryStreamFactory:
@@ -144,6 +147,9 @@ class _ToolboxShellState extends State<ToolboxShell> {
     final gifMatches =
         normalized.isEmpty ||
         'gif录屏 gif 动图 屏幕录制 框选区域 帧 编辑 screentogif'.contains(normalized);
+    final qrMatches =
+        normalized.isEmpty ||
+        '二维码扫描 二维码识别 屏幕扫码 图片扫码 qr qrcode quickscan'.contains(normalized);
     final converterMatches =
         normalized.isEmpty ||
         '图片 图像 格式转换 批量 heic raw jpg jpeg png webp avif jxl tiff imagemagick'
@@ -192,15 +198,26 @@ class _ToolboxShellState extends State<ToolboxShell> {
               ),
               const SizedBox(height: 26),
             ],
-            if (gifMatches) ...[
+            if (gifMatches || qrMatches) ...[
               Text(
                 '屏幕工具',
                 style: Theme.of(context).textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 14),
-              _GifRecorderToolCard(
-                onOpen: () => _open(ToolboxPage.gifRecorder),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  if (gifMatches)
+                    _GifRecorderToolCard(
+                      onOpen: () => _open(ToolboxPage.gifRecorder),
+                    ),
+                  if (qrMatches)
+                    _QrScannerToolCard(
+                      onOpen: () => _open(ToolboxPage.qrScanner),
+                    ),
+                ],
               ),
               const SizedBox(height: 26),
             ],
@@ -229,6 +246,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
             if (!portraitMatches &&
                 !converterMatches &&
                 !gifMatches &&
+                !qrMatches &&
                 !hardwareMatches &&
                 !inputMatches)
               _buildEmptySearch(),
@@ -326,13 +344,13 @@ class _OverviewBanner extends StatelessWidget {
                 ),
                 SizedBox(height: 7),
                 Text(
-                  '集成 GPU 人像处理、格式转换、GIF 录屏、硬件与键鼠检测，数据无需上传。',
+                  '集成 GPU 人像处理、格式转换、GIF 录屏、二维码、硬件与键鼠检测，数据无需上传。',
                   style: TextStyle(color: Color(0xFFDCE8FF), fontSize: 14),
                 ),
               ],
             ),
           ),
-          const _OverviewMetric(value: '5', label: '可用工具'),
+          const _OverviewMetric(value: '6', label: '可用工具'),
           const SizedBox(width: 28),
           if (showScore) ...[
             const _OverviewMetric(value: '114514分', label: '整机性能评分'),
@@ -448,6 +466,15 @@ class _ToolboxNavigation extends StatelessWidget {
               label: 'GIF录屏',
               selected: selected == ToolboxPage.gifRecorder,
               onTap: () => onSelected(ToolboxPage.gifRecorder),
+              compact: compact,
+            ),
+            const SizedBox(height: 4),
+            _NavigationItem(
+              icon: Icons.qr_code_scanner_outlined,
+              selectedIcon: Icons.qr_code_scanner_rounded,
+              label: '二维码扫描',
+              selected: selected == ToolboxPage.qrScanner,
+              onTap: () => onSelected(ToolboxPage.qrScanner),
               compact: compact,
             ),
             if (!compact)
@@ -797,6 +824,85 @@ class _GifRecorderToolCard extends StatelessWidget {
                           _FeatureTag('区域录制'),
                           _FeatureTag('帧编辑'),
                           _FeatureTag('本地编码'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                FilledButton(onPressed: onOpen, child: const Text('打开工具')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QrScannerToolCard extends StatelessWidget {
+  const _QrScannerToolCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 540,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E7EC)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '二维码扫描',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        '直接框选屏幕或导入图片，离线识别并复制二维码内容。',
+                        style: TextStyle(
+                          color: Color(0xFF667085),
+                          height: 1.45,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          _FeatureTag('屏幕框选'),
+                          _FeatureTag('多码识别'),
+                          _FeatureTag('完全离线'),
                         ],
                       ),
                     ],

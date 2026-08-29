@@ -128,6 +128,7 @@ struct RegionSelection {
   RECT result{};
   int virtual_x = 0;
   int virtual_y = 0;
+  std::wstring help_text;
 };
 
 RECT NormalizedRect(const POINT& first, const POINT& second) {
@@ -208,10 +209,13 @@ LRESULT CALLBACK RegionSelectorProc(HWND window, UINT message, WPARAM wparam,
       RECT help_rect{24, 20, client.right - 24, 58};
       SetBkMode(dc, TRANSPARENT);
       SetTextColor(dc, RGB(255, 255, 255));
-      DrawTextW(dc,
-                L"\u62D6\u52A8\u9F20\u6807\u6846\u9009\u5F55\u5236\u533A"
-                L"\u57DF \u00B7 Esc \u6216\u53F3\u952E\u53D6\u6D88",
-                -1, &help_rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      const wchar_t* help_text =
+          state == nullptr || state->help_text.empty()
+              ? L"\u62D6\u52A8\u9F20\u6807\u6846\u9009\u533A\u57DF \u00B7 "
+                L"Esc \u6216\u53F3\u952E\u53D6\u6D88"
+              : state->help_text.c_str();
+      DrawTextW(dc, help_text, -1, &help_rect,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE);
       if (state != nullptr && state->dragging) {
         const RECT selected = NormalizedRect(state->start, state->current);
         HPEN pen = CreatePen(PS_SOLID, 4, RGB(37, 99, 235));
@@ -241,7 +245,8 @@ LRESULT CALLBACK RegionSelectorProc(HWND window, UINT message, WPARAM wparam,
   return DefWindowProc(window, message, wparam, lparam);
 }
 
-std::optional<RECT> SelectScreenRegion(HWND owner_window) {
+std::optional<RECT> SelectScreenRegion(HWND owner_window,
+                                       const std::wstring& help_text) {
   HINSTANCE instance = GetModuleHandle(nullptr);
   WNDCLASSW window_class{};
   window_class.lpfnWndProc = RegionSelectorProc;
@@ -258,6 +263,7 @@ std::optional<RECT> SelectScreenRegion(HWND owner_window) {
   RegionSelection state;
   state.virtual_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
   state.virtual_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+  state.help_text = help_text;
   const int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
   const int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
@@ -453,7 +459,17 @@ ScreenCaptureBridge::ScreenCaptureBridge(flutter::BinaryMessenger* messenger,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) {
         if (call.method_name() == "selectRegion") {
-          const auto selection = SelectScreenRegion(owner_window_);
+          const auto* arguments = call.arguments() == nullptr
+                                      ? nullptr
+                                      : std::get_if<flutter::EncodableMap>(
+                                            call.arguments());
+          const std::string instruction =
+              arguments == nullptr
+                  ? "Select screen region"
+                  : ReadString(*arguments, "instruction",
+                               "Select screen region");
+          const auto selection =
+              SelectScreenRegion(owner_window_, Utf8ToWide(instruction));
           if (!selection.has_value()) {
             result->Success();
             return;
@@ -504,7 +520,13 @@ ScreenCaptureBridge::ScreenCaptureBridge(flutter::BinaryMessenger* messenger,
                                             call.arguments());
           const bool visible =
               arguments == nullptr ? true : ReadBool(*arguments, "visible", true);
-          ShowWindow(owner_window_, visible ? SW_RESTORE : SW_HIDE);
+          if (!visible) {
+            owner_was_maximized_ = IsZoomed(owner_window_) != FALSE;
+            ShowWindow(owner_window_, SW_HIDE);
+          } else {
+            ShowWindow(owner_window_,
+                       owner_was_maximized_ ? SW_SHOWMAXIMIZED : SW_RESTORE);
+          }
           if (visible) {
             SetForegroundWindow(owner_window_);
           }

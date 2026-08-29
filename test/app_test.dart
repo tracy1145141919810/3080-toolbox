@@ -7,11 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:toolbox_3080/main.dart';
 import 'package:toolbox_3080/models/app_models.dart';
+import 'package:toolbox_3080/qr_scanner_screen.dart';
 import 'package:toolbox_3080/services/export_service.dart';
 import 'package:toolbox_3080/services/gif_export_service.dart';
 import 'package:toolbox_3080/services/hardware_detection_service.dart';
 import 'package:toolbox_3080/services/hardware_monitor_service.dart';
 import 'package:toolbox_3080/services/input_test_tracker.dart';
+import 'package:toolbox_3080/services/qr_scanner_service.dart';
 import 'package:toolbox_3080/services/screen_capture_service.dart';
 import 'package:toolbox_3080/toolbox_shell.dart';
 
@@ -23,7 +25,7 @@ void main() {
 
     expect(find.text('3080工具箱'), findsOneWidget);
     expect(find.text('工具中心'), findsNWidgets(2));
-    expect(find.text('打开工具'), findsNWidgets(5));
+    expect(find.text('打开工具'), findsNWidgets(6));
 
     await tester.tap(find.widgetWithText(FilledButton, '打开工具').first);
     await tester.pumpAndSettle();
@@ -45,7 +47,7 @@ void main() {
 
     await tester.tap(find.text('工具中心').first);
     await tester.pumpAndSettle();
-    expect(find.text('打开工具'), findsNWidgets(5));
+    expect(find.text('打开工具'), findsNWidgets(6));
   });
 
   testWidgets('工具搜索和清除搜索可以工作', (tester) async {
@@ -59,7 +61,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(OutlinedButton, '清除搜索'));
     await tester.pump();
-    expect(find.text('打开工具'), findsNWidgets(5));
+    expect(find.text('打开工具'), findsNWidgets(6));
   });
 
   testWidgets('硬件检测独立页面识别 RTX 3080 并在首页显示专属评分', (tester) async {
@@ -311,6 +313,108 @@ void main() {
     await tester.pump();
     expect(find.text('0 / 104'), findsOneWidget);
     expect(find.textContaining('测试记录已重置'), findsOneWidget);
+  });
+
+  testWidgets('二维码扫描页可框选扫描、展示、复制和清空结果', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1180, 820));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    String? copiedText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText =
+              (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final preview = img.Image(width: 24, height: 24);
+    img.fill(preview, color: img.ColorRgb8(245, 247, 250));
+    final payload = QrScanPayload(
+      sourceLabel: '测试屏幕区域',
+      previewPng: Uint8List.fromList(img.encodePng(preview)),
+      width: 320,
+      height: 240,
+      durationMs: 12,
+      results: const [
+        QrDecodedContent(
+          text: 'https://example.com/qr',
+          format: 'QR Code',
+          isInverted: false,
+          isMirrored: false,
+        ),
+        QrDecodedContent(
+          text: '3080工具箱二维码测试',
+          format: 'QR Code',
+          isInverted: true,
+          isMirrored: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QrScannerScreen(screenScanner: () async => payload),
+        ),
+      ),
+    );
+
+    expect(find.text('扫描屏幕二维码'), findsWidgets);
+    expect(find.text('导入图片'), findsOneWidget);
+    expect(find.textContaining('完全离线'), findsWidgets);
+
+    await tester.tap(find.byKey(const ValueKey('scan-screen-qr')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('找到 2 个二维码'), findsOneWidget);
+    expect(find.byKey(const ValueKey('qr-preview')), findsOneWidget);
+    expect(find.text('https://example.com/qr'), findsOneWidget);
+    expect(find.text('3080工具箱二维码测试'), findsOneWidget);
+    expect(find.text('用浏览器打开'), findsOneWidget);
+    expect(find.text('复制全部'), findsOneWidget);
+
+    await tester.tap(find.text('复制全部'));
+    await tester.pump();
+    expect(copiedText, contains('https://example.com/qr'));
+    expect(copiedText, contains('3080工具箱二维码测试'));
+
+    await tester.tap(find.text('清空结果'));
+    await tester.pump();
+    expect(find.text('两种快速扫描方式'), findsOneWidget);
+    expect(find.textContaining('结果已清空'), findsOneWidget);
+  });
+
+  test('二维码内容类型与安全网页链接判定正确', () {
+    const web = QrDecodedContent(
+      text: 'https://example.com/path',
+      format: 'QR Code',
+      isInverted: false,
+      isMirrored: false,
+    );
+    const unsafe = QrDecodedContent(
+      text: 'javascript:alert(1)',
+      format: 'QR Code',
+      isInverted: false,
+      isMirrored: false,
+    );
+    const wifi = QrDecodedContent(
+      text: 'WIFI:T:WPA;S:3080;P:114514;;',
+      format: 'QR Code',
+      isInverted: false,
+      isMirrored: false,
+    );
+    expect(web.contentType, '网页链接');
+    expect(web.webUri, isNotNull);
+    expect(unsafe.webUri, isNull);
+    expect(wifi.contentType, 'Wi-Fi 配置');
   });
 
   test('JPEG 导出同时满足指定分辨率与文件大小上限', () {

@@ -47,9 +47,12 @@ class ScreenCaptureService {
     });
   }
 
-  Future<ScreenRegion?> selectRegion() async {
+  Future<ScreenRegion?> selectRegion({
+    String instruction = '拖动鼠标框选录制区域 · Esc 或右键取消',
+  }) async {
     final result = await _channel.invokeMapMethod<String, Object?>(
       'selectRegion',
+      <String, Object>{'instruction': instruction},
     );
     if (result == null) return null;
     return ScreenRegion(

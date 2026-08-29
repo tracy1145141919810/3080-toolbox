@@ -1,6 +1,6 @@
 # 3080工具箱
 
-一个采用 Flutter 构建的 Windows 本地工具箱。界面使用分类导航方式：左侧选择分类和工具，右侧进入实际工作区。当前内置“白底人像”“图片格式转换”“GIF录屏”“硬件检测”和“键鼠检测”五个模块。
+一个采用 Flutter 构建的 Windows 本地工具箱。界面使用分类导航方式：左侧选择分类和工具，右侧进入实际工作区。当前内置“白底人像”“图片格式转换”“GIF录屏”“二维码扫描”“硬件检测”和“键鼠检测”六个模块。
 
 Windows Runner 将 Flutter UI 隔离线程与窗口消息线程分开，并优先使用高性能 GPU 渲染；当前版本使用更稳定的 Skia Windows 后端，以减少连续拖动窗口边缘时的掉帧和内存抖动。
 
@@ -38,6 +38,15 @@ Windows Runner 将 Flutter UI 隔离线程与窗口消息线程分开，并优�
 - 支持输出宽高、保持宽高比、画质、元数据和同名覆盖设置
 - JPEG、WebP、AVIF、JPEG XL 可设置目标文件大小，程序会自动尝试降低画质
 - 所有转换都在本机完成；本版 ImageMagick 可读取 HEIC/HEIF，但不提供 HEIC/HEIF 编码
+
+### 二维码扫描
+
+- 工具箱自动隐藏后，可直接在屏幕上拖动框选二维码区域并立即恢复窗口
+- 支持导入 PNG、JPG、JPEG、BMP、WebP 和 GIF 图片
+- 支持普通 QR Code、Micro QR Code 与 rMQR，并可一次识别最多 10 个二维码
+- 自动尝试旋转、反色、镜像和较复杂的二维码图像
+- 识别结果支持逐条复制、复制全部以及手动打开 HTTP/HTTPS 网页链接
+- 不会自动执行二维码内容；图片和识别结果完全在本机处理
 
 ### 硬件检测
 
@@ -80,6 +89,13 @@ Windows Runner 将 Flutter UI 隔离线程与窗口消息线程分开，并优�
 4. 点击“正在录制”浮窗会先暂停录制并恢复工具箱，可选择继续或停止。
 5. 在帧时间线中检查或删除帧，设置输出分辨率、色彩与目标 KB，点击“导出 GIF”。
 
+### 二维码扫描使用
+
+1. 从左侧“屏幕工具”进入“二维码扫描”。
+2. 点击“扫描屏幕二维码”，工具箱隐藏后拖动框选屏幕上的二维码；Esc 或右键取消。
+3. 也可点击“导入图片”，选择包含一个或多个二维码的本地图片。
+4. 检查识别内容后，可逐条复制、复制全部或手动用浏览器打开安全网页链接。
+
 ### 硬件检测使用
 
 1. 从左侧“硬件工具”进入“硬件检测”，等待本地检测完成。
@@ -104,7 +120,7 @@ flutter test
 flutter build windows --release
 ```
 
-`windows/runtime` 包含 ONNX Runtime DirectML、CPU 回退运行库、ImageMagick 便携运行时和对应许可文件。白底人像工具的 HEIC 解码依赖由 `heic_native` 在构建时一并打包。
+`windows/runtime` 包含 ONNX Runtime DirectML、CPU 回退运行库、ImageMagick 便携运行时和对应许可文件。白底人像工具的 HEIC 解码依赖由 `heic_native` 在构建时一并打包，二维码解码运行库由 `flutter_zxing` 在 Windows 构建时打包。
 
 ## 许可
 
@@ -113,5 +129,6 @@ flutter build windows --release
 - ONNX Runtime 与 DirectML：MIT
 - heic_native、libheif、libde265、libpng、zlib：许可文本随安装包分发
 - ImageMagick：ImageMagick License；便携运行时许可与 NOTICE 随安装包分发
+- flutter_zxing：MIT；ZXing-C++：Apache-2.0
 
 若计划闭源商用，请先取得适用的 YOLO 商业许可。
