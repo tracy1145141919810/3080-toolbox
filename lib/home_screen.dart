@@ -173,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
           height: height,
           format: _format,
           resizeMode: _resizeMode,
+          backgroundColor: _backgroundColor,
           targetKilobytes: _format == OutputFormat.jpeg ? targetKb! : 0,
         ),
       );
@@ -405,12 +406,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'YOLO 本地识别 · HEIC 支持 · GPU 加速 · 照片不上传',
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: const Color(0xFF667085)),
                 ),
               ],
             ),

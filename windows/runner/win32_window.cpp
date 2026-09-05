@@ -181,9 +181,6 @@ LRESULT CALLBACK Win32Window::ChildWndProc(HWND const window,
                                            LPARAM const lparam) noexcept {
   auto owner = reinterpret_cast<Win32Window*>(
       GetProp(window, kChildOwnerProperty));
-  if (owner != nullptr && owner->is_live_resizing_ && message == WM_SIZE) {
-    return 0;
-  }
   if (owner != nullptr && owner->original_child_window_proc_ != nullptr) {
     return CallWindowProc(owner->original_child_window_proc_, window, message,
                           wparam, lparam);

@@ -17,6 +17,7 @@ class ScreenCaptureBridge {
   HWND owner_window_;
   bool owner_was_maximized_ = false;
   HWND indicator_window_ = nullptr;
+  HANDLE child_job_ = nullptr;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 };
 

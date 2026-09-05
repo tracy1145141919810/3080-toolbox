@@ -96,9 +96,11 @@ class ScreenCaptureService {
     <String, Object>{'visible': visible},
   );
 
-  Future<void> showRecordingIndicator(String text) =>
+  Future<void> showRecordingIndicator(String text, {ScreenRegion? region}) =>
       _channel.invokeMethod<void>('showRecordingIndicator', <String, Object>{
         'text': text,
+        if (region != null) 'x': region.x + region.width ~/ 2,
+        if (region != null) 'y': region.y + region.height ~/ 2,
       });
 
   Future<void> updateRecordingIndicator(String text) =>

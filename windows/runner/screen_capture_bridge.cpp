@@ -89,6 +89,7 @@ LRESULT CALLBACK RecordingIndicatorProc(HWND window, UINT message,
 
 HWND CreateRecordingIndicator(
     const std::wstring& text,
+    POINT anchor,
     flutter::MethodChannel<flutter::EncodableValue>* channel) {
   HINSTANCE instance = GetModuleHandle(nullptr);
   WNDCLASSW window_class{};
@@ -103,12 +104,18 @@ HWND CreateRecordingIndicator(
     return nullptr;
   }
 
-  const int virtual_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
-  const int virtual_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
-  const int virtual_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfoW(MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST),
+                       &monitor_info)) {
+    return nullptr;
+  }
+  const RECT work = monitor_info.rcWork;
+  const int indicator_x = std::max(work.left, work.right - 332);
+  const int indicator_y = std::max(work.top, std::min(work.top + 24, work.bottom - 52));
   HWND indicator = CreateWindowExW(
       WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kIndicatorClassName,
-      text.c_str(), WS_POPUP, virtual_x + virtual_width - 332, virtual_y + 24,
+      text.c_str(), WS_POPUP, indicator_x, indicator_y,
       308, 52, nullptr, nullptr, instance, channel);
   if (indicator == nullptr) {
     return nullptr;
@@ -152,6 +159,19 @@ LRESULT CALLBACK RegionSelectorProc(HWND window, UINT message, WPARAM wparam,
   }
 
   switch (message) {
+    case WM_CLOSE:
+      if (state != nullptr) {
+        state->cancelled = true;
+        state->done = true;
+      }
+      DestroyWindow(window);
+      return 0;
+    case WM_DESTROY:
+      if (state != nullptr && !state->done) {
+        state->cancelled = true;
+        state->done = true;
+      }
+      return 0;
     case WM_SETCURSOR:
       SetCursor(LoadCursor(nullptr, IDC_CROSS));
       return TRUE;
@@ -280,7 +300,7 @@ std::optional<RECT> SelectScreenRegion(HWND owner_window,
   SetFocus(selector);
 
   MSG message{};
-  while (!state.done) {
+  while (!state.done && IsWindow(selector)) {
     const BOOL status = GetMessageW(&message, nullptr, 0, 0);
     if (status <= 0) {
       state.cancelled = true;
@@ -298,7 +318,7 @@ std::optional<RECT> SelectScreenRegion(HWND owner_window,
     DestroyWindow(selector);
   }
   SetForegroundWindow(owner_window);
-  if (state.cancelled) {
+  if (state.cancelled || !state.done) {
     return std::nullopt;
   }
   return state.result;
@@ -458,6 +478,27 @@ ScreenCaptureBridge::ScreenCaptureBridge(flutter::BinaryMessenger* messenger,
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) {
+        if (call.method_name() == "manageChildProcess") {
+          const auto* arguments = call.arguments() == nullptr ? nullptr :
+              std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!arguments) { result->Error("ARGUMENT", "Missing process ID"); return; }
+          if (!child_job_) {
+            child_job_ = CreateJobObjectW(nullptr, nullptr);
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if (!child_job_ || !SetInformationJobObject(child_job_, JobObjectExtendedLimitInformation,
+                &limits, sizeof(limits))) {
+              result->Error("JOB", "Cannot create inference process job"); return;
+            }
+          }
+          HANDLE process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE,
+              static_cast<DWORD>(ReadInt(*arguments, "pid", 0)));
+          const bool ok = process && AssignProcessToJobObject(child_job_, process);
+          if (process) CloseHandle(process);
+          if (!ok) { result->Error("JOB", "Cannot manage inference process lifetime"); return; }
+          result->Success(); return;
+        }
+
         if (call.method_name() == "selectRegion") {
           const auto* arguments = call.arguments() == nullptr
                                       ? nullptr
@@ -545,8 +586,18 @@ ScreenCaptureBridge::ScreenCaptureBridge(flutter::BinaryMessenger* messenger,
           if (indicator_window_ != nullptr && IsWindow(indicator_window_)) {
             DestroyWindow(indicator_window_);
           }
+          POINT anchor{};
+          GetCursorPos(&anchor);
+          if (arguments != nullptr) {
+            anchor.x = ReadInt(*arguments, "x", anchor.x);
+            anchor.y = ReadInt(*arguments, "y", anchor.y);
+          }
           indicator_window_ =
-              CreateRecordingIndicator(Utf8ToWide(text), channel_.get());
+              CreateRecordingIndicator(Utf8ToWide(text), anchor, channel_.get());
+          if (indicator_window_ == nullptr) {
+            result->Error("indicator_failed", "Cannot create recording indicator");
+            return;
+          }
           result->Success(flutter::EncodableValue(indicator_window_ != nullptr));
           return;
         }
@@ -581,6 +632,7 @@ ScreenCaptureBridge::ScreenCaptureBridge(flutter::BinaryMessenger* messenger,
 }
 
 ScreenCaptureBridge::~ScreenCaptureBridge() {
+  if (child_job_) CloseHandle(child_job_);
   if (indicator_window_ != nullptr && IsWindow(indicator_window_)) {
     DestroyWindow(indicator_window_);
   }

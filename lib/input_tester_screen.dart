@@ -16,7 +16,7 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
   final _clock = Stopwatch()..start();
   final _tracker = InputTestTracker();
   final List<_InputLogEntry> _events = <_InputLogEntry>[];
-  String _status = '等待输入 · 请按下任意键或在鼠标测试区操作';
+  String _status = '等待输入';
   bool _lastWasDouble = false;
 
   static final List<List<_KeySpec>> _functionRows = [
@@ -228,15 +228,23 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
     return KeyEventResult.handled;
   }
 
-  void _handlePointerDown(PointerDownEvent event) {
+  void _handlePointerDown(PointerEvent event) {
     final newButtons = <int>{
       for (final spec in _mouseButtons)
         if ((event.buttons & spec.button) != 0 &&
             !_tracker.activeMouseButtons.contains(spec.button))
           spec.button,
     };
-    if (newButtons.isEmpty) return;
+    final buttons = _buttonSet(event.buttons);
+    if (newButtons.isEmpty &&
+        buttons.length == _tracker.activeMouseButtons.length &&
+        buttons.containsAll(_tracker.activeMouseButtons)) {
+      return;
+    }
     setState(() {
+      _tracker.mouseButtonsChanged(
+        buttons.intersection(_tracker.activeMouseButtons),
+      );
       for (final button in newButtons) {
         final result = _tracker.mouseDown(
           button: button,
@@ -355,11 +363,6 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
           style: Theme.of(context).textTheme.headlineSmall
               ?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 5),
-        const Text(
-          '全键位触发、鼠标五键与滚轮、键盘连击和鼠标双击检测 · 数据仅在本机处理',
-          style: TextStyle(color: Color(0xFF667085)),
-        ),
       ],
     );
     final reset = OutlinedButton.icon(
@@ -471,7 +474,6 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
   Widget _buildKeyboardPanel() {
     return _Panel(
       title: '全键盘键位检测',
-      subtitle: '按下时显示蓝色，已成功触发显示绿色；红色角标为该键检测到的双击次数。',
       icon: Icons.keyboard_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,11 +602,11 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
   Widget _buildMousePanel() {
     return _Panel(
       title: '鼠标键位检测',
-      subtitle: '请在下方区域点击或滚动，支持左/中/右、后退和前进侧键。',
       icon: Icons.mouse_rounded,
       child: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _handlePointerDown,
+        onPointerMove: _handlePointerDown,
         onPointerUp: _handlePointerUp,
         onPointerCancel: (_) =>
             setState(() => _tracker.mouseButtonsChanged(const <int>{})),
@@ -656,7 +658,6 @@ class _InputTesterScreenState extends State<InputTesterScreen> {
   Widget _buildDiagnosticsPanel() {
     return _Panel(
       title: '双击判定与触发记录',
-      subtitle: '自动连发 KeyRepeat 不计为双击；双击按两次独立的按下/松开统计。',
       icon: Icons.fact_check_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1086,15 +1087,9 @@ class _SideMouseButton extends StatelessWidget {
 }
 
 class _Panel extends StatelessWidget {
-  const _Panel({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.child,
-  });
+  const _Panel({required this.title, required this.icon, required this.child});
 
   final String title;
-  final String subtitle;
   final IconData icon;
   final Widget child;
 
@@ -1124,14 +1119,6 @@ class _Panel extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 12,
                       ),
                     ),
                   ],

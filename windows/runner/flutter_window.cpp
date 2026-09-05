@@ -73,7 +73,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       // repeatedly while the user drags a window edge.
       const LRESULT result =
           Win32Window::MessageHandler(hwnd, message, wparam, lparam);
-      if (flutter_controller_ && !IsLiveResizing()) {
+      if (flutter_controller_) {
         flutter_controller_->ForceRedraw();
       }
       return result;

@@ -84,6 +84,7 @@ class ExportSettings {
     required this.format,
     required this.resizeMode,
     required this.targetKilobytes,
+    this.backgroundColor = RgbColor.white,
   });
 
   final int width;
@@ -91,6 +92,7 @@ class ExportSettings {
   final OutputFormat format;
   final ResizeMode resizeMode;
   final int targetKilobytes;
+  final RgbColor backgroundColor;
 }
 
 class ExportResult {

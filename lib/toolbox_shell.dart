@@ -6,6 +6,7 @@ import 'home_screen.dart';
 import 'image_converter_screen.dart';
 import 'input_tester_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'local_translation_screen.dart';
 import 'services/hardware_detection_service.dart';
 import 'services/hardware_monitor_service.dart';
 
@@ -15,6 +16,7 @@ enum ToolboxPage {
   imageConverter,
   gifRecorder,
   qrScanner,
+  screenTranslation,
   hardwareDetection,
   inputTester,
 }
@@ -62,6 +64,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
         final compactNavigation = constraints.maxWidth < 1000;
         return Scaffold(
           body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _ToolboxNavigation(
                 selected: _page,
@@ -77,6 +80,8 @@ class _ToolboxShellState extends State<ToolboxShell> {
                     ToolboxPage.imageConverter => const ImageConverterScreen(),
                     ToolboxPage.gifRecorder => const GifRecorderScreen(),
                     ToolboxPage.qrScanner => const QrScannerScreen(),
+                    ToolboxPage.screenTranslation =>
+                      const LocalTranslationScreen(),
                     ToolboxPage.hardwareDetection => HardwareDetectionScreen(
                       loader: widget.hardwareLoader,
                       telemetryStreamFactory:
@@ -102,12 +107,6 @@ class _ToolboxShellState extends State<ToolboxShell> {
           '工具中心',
           style: Theme.of(context).textTheme.headlineMedium
               ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '选择工具即可使用，图像处理和屏幕录制均在本机完成。',
-          style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: const Color(0xFF667085)),
         ),
       ],
     );
@@ -150,6 +149,11 @@ class _ToolboxShellState extends State<ToolboxShell> {
     final qrMatches =
         normalized.isEmpty ||
         '二维码扫描 二维码识别 屏幕扫码 图片扫码 qr qrcode quickscan'.contains(normalized);
+    final translationMatches =
+        normalized.isEmpty ||
+        '屏幕翻译 截图翻译 日语 英语 中文 OCR Hy-MT 混元 Qwen 离线 本地 翻译'.toLowerCase().contains(
+          normalized,
+        );
     final converterMatches =
         normalized.isEmpty ||
         '图片 图像 格式转换 批量 heic raw jpg jpeg png webp avif jxl tiff imagemagick'
@@ -198,7 +202,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
               ),
               const SizedBox(height: 26),
             ],
-            if (gifMatches || qrMatches) ...[
+            if (gifMatches || qrMatches || translationMatches) ...[
               Text(
                 '屏幕工具',
                 style: Theme.of(context).textTheme.titleLarge
@@ -216,6 +220,10 @@ class _ToolboxShellState extends State<ToolboxShell> {
                   if (qrMatches)
                     _QrScannerToolCard(
                       onOpen: () => _open(ToolboxPage.qrScanner),
+                    ),
+                  if (translationMatches)
+                    _ScreenTranslationToolCard(
+                      onOpen: () => _open(ToolboxPage.screenTranslation),
                     ),
                 ],
               ),
@@ -247,6 +255,7 @@ class _ToolboxShellState extends State<ToolboxShell> {
                 !converterMatches &&
                 !gifMatches &&
                 !qrMatches &&
+                !translationMatches &&
                 !hardwareMatches &&
                 !inputMatches)
               _buildEmptySearch(),
@@ -292,75 +301,23 @@ class _ToolboxShellState extends State<ToolboxShell> {
 
 class _OverviewBanner extends StatelessWidget {
   const _OverviewBanner({required this.showScore});
-
   final bool showScore;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x242563EB),
-            blurRadius: 24,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.offline_bolt_rounded,
-              size: 34,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 20),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '本地影像处理工作台',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 7),
-                Text(
-                  '集成 GPU 人像处理、格式转换、GIF 录屏、二维码、硬件与键鼠检测，数据无需上传。',
-                  style: TextStyle(color: Color(0xFFDCE8FF), fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          const _OverviewMetric(value: '6', label: '可用工具'),
-          const SizedBox(width: 28),
-          if (showScore) ...[
-            const _OverviewMetric(value: '114514分', label: '整机性能评分'),
-            const SizedBox(width: 28),
-          ],
-          const _OverviewMetric(value: 'GPU', label: '本地加速'),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    decoration: BoxDecoration(
+      color: const Color(0xFF2563EB),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Wrap(
+      spacing: 28,
+      runSpacing: 12,
+      children: [
+        const _OverviewMetric(value: '7', label: '可用工具'),
+        if (showScore) const _OverviewMetric(value: '114514分', label: '整机性能评分'),
+      ],
+    ),
+  );
 }
 
 class _ToolboxNavigation extends StatelessWidget {
@@ -411,114 +368,119 @@ class _ToolboxNavigation extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 28),
-            _NavigationItem(
-              icon: Icons.home_outlined,
-              selectedIcon: Icons.home_rounded,
-              label: '工具中心',
-              selected: selected == ToolboxPage.home,
-              onTap: () => onSelected(ToolboxPage.home),
-              compact: compact,
-            ),
-            if (!compact)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
-                child: Text(
-                  '图像处理',
-                  style: TextStyle(
-                    color: Color(0xFF98A2B3),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _NavigationItem(
+                      icon: Icons.home_outlined,
+                      selectedIcon: Icons.home_rounded,
+                      label: '工具中心',
+                      selected: selected == ToolboxPage.home,
+                      onTap: () => onSelected(ToolboxPage.home),
+                      compact: compact,
+                    ),
+                    if (!compact)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
+                        child: Text(
+                          '图像处理',
+                          style: TextStyle(
+                            color: Color(0xFF98A2B3),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    _NavigationItem(
+                      icon: Icons.person_outline_rounded,
+                      selectedIcon: Icons.person_rounded,
+                      label: '白底人像',
+                      selected: selected == ToolboxPage.portraitBackground,
+                      onTap: () => onSelected(ToolboxPage.portraitBackground),
+                      compact: compact,
+                    ),
+                    const SizedBox(height: 4),
+                    _NavigationItem(
+                      icon: Icons.compare_arrows_rounded,
+                      selectedIcon: Icons.swap_horiz_rounded,
+                      label: '格式转换',
+                      selected: selected == ToolboxPage.imageConverter,
+                      onTap: () => onSelected(ToolboxPage.imageConverter),
+                      compact: compact,
+                    ),
+                    if (!compact)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
+                        child: Text(
+                          '屏幕工具',
+                          style: TextStyle(
+                            color: Color(0xFF98A2B3),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    _NavigationItem(
+                      icon: Icons.gif_box_outlined,
+                      selectedIcon: Icons.gif_box_rounded,
+                      label: 'GIF录屏',
+                      selected: selected == ToolboxPage.gifRecorder,
+                      onTap: () => onSelected(ToolboxPage.gifRecorder),
+                      compact: compact,
+                    ),
+                    const SizedBox(height: 4),
+                    _NavigationItem(
+                      icon: Icons.qr_code_scanner_outlined,
+                      selectedIcon: Icons.qr_code_scanner_rounded,
+                      label: '二维码扫描',
+                      selected: selected == ToolboxPage.qrScanner,
+                      onTap: () => onSelected(ToolboxPage.qrScanner),
+                      compact: compact,
+                    ),
+                    const SizedBox(height: 4),
+                    _NavigationItem(
+                      icon: Icons.translate_rounded,
+                      selectedIcon: Icons.translate_rounded,
+                      label: '屏幕翻译',
+                      selected: selected == ToolboxPage.screenTranslation,
+                      onTap: () => onSelected(ToolboxPage.screenTranslation),
+                      compact: compact,
+                    ),
+                    if (!compact)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
+                        child: Text(
+                          '硬件工具',
+                          style: TextStyle(
+                            color: Color(0xFF98A2B3),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    _NavigationItem(
+                      icon: Icons.monitor_heart_outlined,
+                      selectedIcon: Icons.monitor_heart_rounded,
+                      label: '硬件检测',
+                      selected: selected == ToolboxPage.hardwareDetection,
+                      onTap: () => onSelected(ToolboxPage.hardwareDetection),
+                      compact: compact,
+                    ),
+                    const SizedBox(height: 4),
+                    _NavigationItem(
+                      icon: Icons.keyboard_alt_outlined,
+                      selectedIcon: Icons.keyboard_alt_rounded,
+                      label: '键鼠检测',
+                      selected: selected == ToolboxPage.inputTester,
+                      onTap: () => onSelected(ToolboxPage.inputTester),
+                      compact: compact,
+                    ),
+                  ],
                 ),
               ),
-            _NavigationItem(
-              icon: Icons.person_outline_rounded,
-              selectedIcon: Icons.person_rounded,
-              label: '白底人像',
-              selected: selected == ToolboxPage.portraitBackground,
-              onTap: () => onSelected(ToolboxPage.portraitBackground),
-              compact: compact,
             ),
-            const SizedBox(height: 4),
-            _NavigationItem(
-              icon: Icons.compare_arrows_rounded,
-              selectedIcon: Icons.swap_horiz_rounded,
-              label: '格式转换',
-              selected: selected == ToolboxPage.imageConverter,
-              onTap: () => onSelected(ToolboxPage.imageConverter),
-              compact: compact,
-            ),
-            if (!compact)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
-                child: Text(
-                  '屏幕工具',
-                  style: TextStyle(
-                    color: Color(0xFF98A2B3),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            _NavigationItem(
-              icon: Icons.gif_box_outlined,
-              selectedIcon: Icons.gif_box_rounded,
-              label: 'GIF录屏',
-              selected: selected == ToolboxPage.gifRecorder,
-              onTap: () => onSelected(ToolboxPage.gifRecorder),
-              compact: compact,
-            ),
-            const SizedBox(height: 4),
-            _NavigationItem(
-              icon: Icons.qr_code_scanner_outlined,
-              selectedIcon: Icons.qr_code_scanner_rounded,
-              label: '二维码扫描',
-              selected: selected == ToolboxPage.qrScanner,
-              onTap: () => onSelected(ToolboxPage.qrScanner),
-              compact: compact,
-            ),
-            if (!compact)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(12, 24, 12, 8),
-                child: Text(
-                  '硬件工具',
-                  style: TextStyle(
-                    color: Color(0xFF98A2B3),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            _NavigationItem(
-              icon: Icons.monitor_heart_outlined,
-              selectedIcon: Icons.monitor_heart_rounded,
-              label: '硬件检测',
-              selected: selected == ToolboxPage.hardwareDetection,
-              onTap: () => onSelected(ToolboxPage.hardwareDetection),
-              compact: compact,
-            ),
-            const SizedBox(height: 4),
-            _NavigationItem(
-              icon: Icons.keyboard_alt_outlined,
-              selectedIcon: Icons.keyboard_alt_rounded,
-              label: '键鼠检测',
-              selected: selected == ToolboxPage.inputTester,
-              onTap: () => onSelected(ToolboxPage.inputTester),
-              compact: compact,
-            ),
-            const Spacer(),
-            if (!compact)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '本地运行\n模型与照片不上传',
-                  style: TextStyle(
-                    color: Color(0xFF98A2B3),
-                    fontSize: 12,
-                    height: 1.6,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -651,23 +613,6 @@ class _PortraitToolCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        '人像自动抠图、任意背景色、证件照尺寸与文件体积控制。',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('YOLO'),
-                          _FeatureTag('GPU'),
-                          _FeatureTag('HEIC'),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -729,23 +674,6 @@ class _ImageConverterToolCard extends StatelessWidget {
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        '主流图片批量互转，支持 HEIC/RAW 输入、分辨率和文件大小控制。',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('批量转换'),
-                          _FeatureTag('HEIC/RAW'),
-                          _FeatureTag('本地处理'),
-                        ],
                       ),
                     ],
                   ),
@@ -809,23 +737,6 @@ class _GifRecorderToolCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        '框选屏幕区域录制，预览和删除帧，控制分辨率与 GIF 文件大小。',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('区域录制'),
-                          _FeatureTag('帧编辑'),
-                          _FeatureTag('本地编码'),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -888,22 +799,67 @@ class _QrScannerToolCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 6),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                FilledButton(onPressed: onOpen, child: const Text('打开工具')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScreenTranslationToolCard extends StatelessWidget {
+  const _ScreenTranslationToolCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 540,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E7EC)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(
+                    Icons.translate_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '直接框选屏幕或导入图片，离线识别并复制二维码内容。',
+                        '屏幕翻译',
                         style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('屏幕框选'),
-                          _FeatureTag('多码识别'),
-                          _FeatureTag('完全离线'),
-                        ],
                       ),
                     ],
                   ),
@@ -967,23 +923,6 @@ class _HardwareDetectionToolCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        '独立页面展示整机型号、系统、运行时间和详细硬件配置。',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('CPU/GPU'),
-                          _FeatureTag('磁盘/内存'),
-                          _FeatureTag('本地只读'),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -1046,23 +985,6 @@ class _InputTesterToolCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        '直观显示104键触发状态，检测键盘连击、鼠标五键、滚轮和双击。',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          height: 1.45,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _FeatureTag('104键'),
-                          _FeatureTag('双击统计'),
-                          _FeatureTag('鼠标侧键'),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -1071,31 +993,6 @@ class _InputTesterToolCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FeatureTag extends StatelessWidget {
-  const _FeatureTag(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F7),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF475467),
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );

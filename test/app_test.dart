@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:toolbox_3080/main.dart';
+import 'package:toolbox_3080/local_translation_screen.dart';
 import 'package:toolbox_3080/models/app_models.dart';
 import 'package:toolbox_3080/qr_scanner_screen.dart';
 import 'package:toolbox_3080/services/export_service.dart';
@@ -18,6 +19,40 @@ import 'package:toolbox_3080/services/screen_capture_service.dart';
 import 'package:toolbox_3080/toolbox_shell.dart';
 
 void main() {
+  testWidgets('屏幕翻译可从搜索卡片及侧栏进入，并返回工具中心', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const Toolbox3080App());
+    expect(find.text('7'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'qwen');
+    await tester.pump();
+    expect(find.text('打开工具'), findsOneWidget);
+    expect(find.text('没有找到匹配的工具'), findsNothing);
+    await tester.ensureVisible(find.widgetWithText(FilledButton, '打开工具'));
+    await tester.tap(find.widgetWithText(FilledButton, '打开工具'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalTranslationScreen), findsOneWidget);
+    expect(find.text('框选屏幕翻译'), findsOneWidget);
+    await tester.tap(find.text('工具中心').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalTranslationScreen), findsNothing);
+    await tester.tap(find.text('屏幕翻译').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalTranslationScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('矮窗口下侧栏可滚动，收起侧栏仍可进入屏幕翻译', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(900, 520));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const Toolbox3080App());
+    final translation = find.byTooltip('屏幕翻译');
+    await tester.ensureVisible(translation);
+    await tester.tap(translation);
+    await tester.pumpAndSettle();
+    expect(find.byType(LocalTranslationScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('工具箱首页可以进入白底人像并返回工具中心', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -25,7 +60,7 @@ void main() {
 
     expect(find.text('3080工具箱'), findsOneWidget);
     expect(find.text('工具中心'), findsNWidgets(2));
-    expect(find.text('打开工具'), findsNWidgets(6));
+    expect(find.text('打开工具'), findsNWidgets(7));
 
     await tester.tap(find.widgetWithText(FilledButton, '打开工具').first);
     await tester.pumpAndSettle();
@@ -47,7 +82,7 @@ void main() {
 
     await tester.tap(find.text('工具中心').first);
     await tester.pumpAndSettle();
-    expect(find.text('打开工具'), findsNWidgets(6));
+    expect(find.text('打开工具'), findsNWidgets(7));
   });
 
   testWidgets('工具搜索和清除搜索可以工作', (tester) async {
@@ -61,7 +96,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(OutlinedButton, '清除搜索'));
     await tester.pump();
-    expect(find.text('打开工具'), findsNWidgets(6));
+    expect(find.text('打开工具'), findsNWidgets(7));
   });
 
   testWidgets('硬件检测独立页面识别 RTX 3080 并在首页显示专属评分', (tester) async {
@@ -369,7 +404,7 @@ void main() {
 
     expect(find.text('扫描屏幕二维码'), findsWidgets);
     expect(find.text('导入图片'), findsOneWidget);
-    expect(find.textContaining('完全离线'), findsWidgets);
+    expect(find.textContaining('完全离线'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('scan-screen-qr')));
     await tester.pumpAndSettle();
@@ -388,7 +423,7 @@ void main() {
 
     await tester.tap(find.text('清空结果'));
     await tester.pump();
-    expect(find.text('两种快速扫描方式'), findsOneWidget);
+    expect(find.text('暂无识别结果'), findsOneWidget);
     expect(find.textContaining('结果已清空'), findsOneWidget);
   });
 

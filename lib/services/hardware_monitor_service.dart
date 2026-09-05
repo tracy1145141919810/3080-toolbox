@@ -96,8 +96,6 @@ class HardwareMonitorService {
         '-NoLogo',
         '-NoProfile',
         '-NonInteractive',
-        '-WindowStyle',
-        'Hidden',
         '-EncodedCommand',
         _encodePowerShell(_powerShellScript),
       ], runInShell: false);
@@ -191,8 +189,8 @@ while ($true) {
   $memory = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory | Select-Object -First 1
   if ($null -ne $memory -and $memoryTotalGb -gt 0) {
     $availableGb = [double]$memory.AvailableMBytes / 1024
-    $memoryUsedGb = [Math]::Max(0, $memoryTotalGb - $availableGb)
-    $memoryUsage = [Math]::Min(100, [Math]::Max(0, ($memoryUsedGb / $memoryTotalGb) * 100))
+    $memoryUsedGb = [Math]::Max(0.0, $memoryTotalGb - $availableGb)
+    $memoryUsage = [Math]::Min(100.0, [Math]::Max(0.0, ($memoryUsedGb / $memoryTotalGb) * 100))
   }
 
   if ($hasNvidiaSmi) {

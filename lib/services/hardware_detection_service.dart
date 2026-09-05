@@ -116,7 +116,7 @@ class HardwareSnapshot {
       buffer.writeln('【${section.title}】');
       for (final item in section.items) {
         final value =
-            hasRtx3080 &&
+            RegExp(r'RTX\s*3080\b', caseSensitive: false).hasMatch(item.value) &&
                 section.id == 'gpu' &&
                 RegExp(r'^显卡 \d+$').hasMatch(item.label)
             ? '老牧师3080'

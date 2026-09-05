@@ -40,3 +40,10 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# Local Windows OCR helper. WinRT uses C++ exceptions, unlike Flutter wrappers.
+add_executable(toolbox_ocr WIN32 "ocr_helper.cpp")
+target_compile_features(toolbox_ocr PRIVATE cxx_std_17)
+target_compile_options(toolbox_ocr PRIVATE /EHsc /utf-8)
+target_compile_definitions(toolbox_ocr PRIVATE NOMINMAX)
+target_link_libraries(toolbox_ocr PRIVATE windowsapp runtimeobject shell32)

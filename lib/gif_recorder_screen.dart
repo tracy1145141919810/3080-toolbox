@@ -38,6 +38,12 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   bool _paused = false;
   bool _capturing = false;
   bool _exporting = false;
+  bool _transitioning = false;
+  bool _stopping = false;
+  int _generation = 0;
+  int _previewRequest = 0;
+  int _recordedFps = 5;
+  bool get _locked => _recording || _transitioning || _exporting;
   String _status = '选择屏幕区域后即可开始录制。';
   String? _exportedPath;
 
@@ -51,6 +57,9 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
 
   @override
   void dispose() {
+    _generation++;
+    _previewRequest++;
+    _recording = false;
     _timer?.cancel();
     _captureService.setRecordingIndicatorCallback(null);
     unawaited(_captureService.hideRecordingIndicator());
@@ -60,7 +69,8 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _selectRegion() async {
-    if (_recording) return;
+    if (_locked) return;
+    setState(() => _transitioning = true);
     try {
       final selected = await _captureService.selectRegion();
       if (!mounted || selected == null) return;
@@ -70,6 +80,8 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
       });
     } catch (error) {
       _showError('无法选择区域：$error');
+    } finally {
+      if (mounted) setState(() => _transitioning = false);
     }
   }
 
@@ -87,17 +99,21 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _startRecording() async {
-    if (_recording) return;
+    if (_locked) return;
     if (_region == null) {
       await _selectRegion();
       if (_region == null || !mounted) return;
     }
     _timer?.cancel();
+    final generation = ++_generation;
+    _previewRequest++;
+    _recordedFps = _effectiveFps;
     _frames.clear();
     _thumbnails.clear();
     _lastIndicatorSecond = -1;
-    _stopwatch = Stopwatch()..start();
+    _stopwatch = Stopwatch();
     setState(() {
+      _transitioning = true;
       _recording = true;
       _paused = false;
       _selectedFrame = -1;
@@ -105,14 +121,35 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
       _exportedPath = null;
       _status = '正在录制 · 0 帧';
     });
-    await _captureService.showRecordingIndicator(_indicatorText());
-    await _captureService.setToolboxVisible(false);
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    await _captureFrame();
-    _timer = Timer.periodic(
-      Duration(milliseconds: (1000 / _effectiveFps).round()),
-      (_) => _captureTick(),
-    );
+    try {
+      await _captureService.showRecordingIndicator(
+        _indicatorText(),
+        region: _region,
+      );
+      if (!mounted || generation != _generation) return;
+      await _captureService.setToolboxVisible(false);
+      if (!mounted || generation != _generation) return;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (!mounted || generation != _generation) return;
+      _stopwatch?.start();
+      await _captureFrame();
+      if (!mounted || generation != _generation || !_recording) return;
+      _timer = Timer.periodic(
+        Duration(milliseconds: (1000 / _recordedFps).round()),
+        (_) => _captureTick(),
+      );
+    } catch (error) {
+      if (mounted && generation == _generation) {
+        _recording = false;
+        await _captureService.hideRecordingIndicator();
+        await _captureService.setToolboxVisible(true);
+        _showError('无法开始录制：$error');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _transitioning = false);
+      }
+    }
   }
 
   Future<void> _captureTick() async {
@@ -143,6 +180,7 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
 
   Future<void> _captureFrame() async {
     final region = _region;
+    final generation = _generation;
     if (region == null || _capturing) return;
     _capturing = true;
     try {
@@ -153,15 +191,19 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
         outputHeight: height,
         includeCursor: _includeCursor,
       );
-      if (!mounted || !_recording) return;
+      if (!mounted || !_recording || _paused || generation != _generation) {
+        return;
+      }
       final frame = await _gifService.compressFrame(rawFrame);
-      if (!mounted || !_recording) return;
+      if (!mounted || !_recording || _paused || generation != _generation) {
+        return;
+      }
       _frames.add(frame);
       setState(() {
         _status = '正在录制 · ${_frames.length} 帧';
       });
     } catch (error) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         await _stopRecording();
         _showError('屏幕录制失败：$error');
       }
@@ -171,7 +213,7 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _pauseAndShowToolbox() async {
-    if (!_recording) return;
+    if (!mounted || !_recording || _transitioning) return;
     if (!_paused) {
       _stopwatch?.stop();
       setState(() {
@@ -184,7 +226,8 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _togglePause() async {
-    if (!_recording) return;
+    if (!mounted || !_recording || _transitioning) return;
+    final generation = _generation;
     if (!_paused) {
       await _pauseAndShowToolbox();
       return;
@@ -195,37 +238,60 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
       _status = '正在录制 · ${_frames.length} 帧';
     });
     await _captureService.updateRecordingIndicator(_indicatorText());
+    if (!mounted || generation != _generation) return;
     await _captureService.setToolboxVisible(false);
   }
 
   Future<void> _stopRecording() async {
-    if (!_recording) return;
-    _timer?.cancel();
-    _stopwatch?.stop();
-    await _captureService.hideRecordingIndicator();
-    await _captureService.setToolboxVisible(true);
+    if (!mounted || !_recording || _stopping) return;
+    final generation = ++_generation;
+    _previewRequest++;
     setState(() {
       _recording = false;
-      _paused = false;
-      _status = _frames.isEmpty ? '没有捕获到画面。' : '正在生成帧预览…';
+      _transitioning = true;
+      _stopping = true;
     });
-    if (_frames.isEmpty) return;
-    final previews = await _gifService.createThumbnails(_frames);
-    final preview = await _gifService.createPreview(_frames.last);
-    if (!mounted) return;
-    setState(() {
-      _thumbnails
-        ..clear()
-        ..addAll(previews);
-      _preview = preview;
-      _selectedFrame = _frames.length - 1;
-      _status = '录制完成 · ${_frames.length} 帧，可删除不需要的帧后导出。';
-    });
+    _timer?.cancel();
+    _stopwatch?.stop();
+    final frames = List<RecordedScreenFrame>.of(_frames);
+    try {
+      await _captureService.hideRecordingIndicator();
+      await _captureService.setToolboxVisible(true);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _recording = false;
+        _paused = false;
+        _status = _frames.isEmpty ? '没有捕获到画面。' : '正在生成帧预览…';
+      });
+      if (frames.isEmpty) return;
+      final previews = await _gifService.createThumbnails(frames);
+      final preview = await _gifService.createPreview(frames.last);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _thumbnails
+          ..clear()
+          ..addAll(previews);
+        _preview = preview;
+        _selectedFrame = _frames.length - 1;
+        _status = '录制完成 · ${_frames.length} 帧，可删除不需要的帧后导出。';
+      });
+    } catch (error) {
+      _showError('生成录制预览失败：$error');
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _transitioning = false;
+          _stopping = false;
+        });
+      }
+    }
   }
 
   Future<void> _selectFrame(int index) async {
+    if (_locked || index < 0 || index >= _frames.length) return;
+    final request = ++_previewRequest;
     final preview = await _gifService.createPreview(_frames[index]);
-    if (!mounted) return;
+    if (!mounted || request != _previewRequest) return;
     setState(() {
       _selectedFrame = index;
       _preview = preview;
@@ -233,7 +299,7 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _deleteSelectedFrame() async {
-    if (_selectedFrame < 0 || _recording) return;
+    if (_selectedFrame < 0 || _locked) return;
     final index = _selectedFrame;
     _frames.removeAt(index);
     _thumbnails.removeAt(index);
@@ -250,7 +316,8 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   void _clearFrames() {
-    if (_recording || _frames.isEmpty) return;
+    if (_locked || _frames.isEmpty) return;
+    _previewRequest++;
     setState(() {
       _frames.clear();
       _thumbnails.clear();
@@ -262,28 +329,30 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Future<void> _exportGif() async {
-    if (_frames.isEmpty || _recording || _exporting) return;
+    if (_frames.isEmpty || _locked) return;
     final target = int.tryParse(_targetSizeController.text.trim());
     if (target == null || target < 0) {
       _showError('目标大小请输入 0 或正整数。');
       return;
     }
-    final location = await getSaveLocation(
-      suggestedName: '3080录屏_${DateTime.now().millisecondsSinceEpoch}.gif',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'GIF 动图', extensions: ['gif']),
-      ],
-    );
-    if (location == null) return;
-    setState(() {
-      _exporting = true;
-      _status = '正在本地编码 GIF…';
-    });
+    setState(() => _exporting = true);
+    final frames = List<RecordedScreenFrame>.of(_frames);
     try {
+      final location = await getSaveLocation(
+        suggestedName: '3080录屏_${DateTime.now().millisecondsSinceEpoch}.gif',
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'GIF 动图', extensions: ['gif']),
+        ],
+      );
+      if (location == null || !mounted) return;
+      setState(() {
+        _exporting = true;
+        _status = '正在本地编码 GIF…';
+      });
       final result = await _gifService.encode(
-        _frames,
+        frames,
         GifExportSettings(
-          framesPerSecond: _fps,
+          framesPerSecond: _recordedFps,
           colors: _colors,
           scalePercent: _scalePercent,
           targetKilobytes: target,
@@ -349,42 +418,34 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
   }
 
   Widget _buildHeader() {
-    return Row(
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'GIF录屏',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                '框选区域 · 帧预览与删除 · 本地 GIF 编码 · 画面不上传',
-                style: TextStyle(color: Color(0xFF667085)),
-              ),
-            ],
-          ),
+        Text(
+          'GIF录屏',
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
         ),
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         OutlinedButton.icon(
-          onPressed: _recording ? null : _selectRegion,
+          onPressed: _locked ? null : _selectRegion,
           icon: const Icon(Icons.crop_free_rounded),
           label: const Text('选择录制区域'),
         ),
         const SizedBox(width: 10),
         if (!_recording)
           FilledButton.icon(
-            onPressed: _startRecording,
+            onPressed: _locked ? null : _startRecording,
             icon: const Icon(Icons.fiber_manual_record_rounded, size: 18),
             label: const Text('开始录制'),
           )
         else ...[
           OutlinedButton.icon(
-            onPressed: _togglePause,
+            onPressed: _transitioning ? null : _togglePause,
             icon: Icon(
               _paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
             ),
@@ -395,12 +456,29 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFD92D20),
             ),
-            onPressed: _stopRecording,
+            onPressed: _transitioning ? null : _stopRecording,
             icon: const Icon(Icons.stop_rounded),
             label: const Text('停止录制'),
           ),
         ],
       ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth < 650
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerRight, child: actions),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: title),
+                actions,
+              ],
+            ),
     );
   }
 
@@ -448,7 +526,7 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          _recording ? '正在捕获屏幕…' : '录制完成后在这里预览画面',
+                          _recording ? '正在捕获屏幕…' : '暂无录制内容',
                           style: const TextStyle(color: Color(0xFFD0D5DD)),
                         ),
                       ],
@@ -461,29 +539,51 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              const Text('帧时间线', style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(width: 8),
-              Text(
-                '${_frames.length} 帧',
-                style: const TextStyle(color: Color(0xFF667085)),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _selectedFrame >= 0 && !_recording
-                    ? _deleteSelectedFrame
-                    : null,
-                icon: const Icon(Icons.delete_outline_rounded, size: 19),
-                label: const Text('删除所选帧'),
-              ),
-              TextButton(
-                onPressed: _frames.isNotEmpty && !_recording
-                    ? _clearFrames
-                    : null,
-                child: const Text('清空'),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final label = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '帧时间线',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_frames.length} 帧',
+                    style: const TextStyle(color: Color(0xFF667085)),
+                  ),
+                ],
+              );
+              final actions = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: _selectedFrame >= 0 && !_locked
+                        ? _deleteSelectedFrame
+                        : null,
+                    icon: const Icon(Icons.delete_outline_rounded, size: 19),
+                    label: const Text('删除所选帧'),
+                  ),
+                  TextButton(
+                    onPressed: _frames.isNotEmpty && !_locked
+                        ? _clearFrames
+                        : null,
+                    child: const Text('清空'),
+                  ),
+                ],
+              );
+              if (constraints.maxWidth < 430) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    label,
+                    Align(alignment: Alignment.centerRight, child: actions),
+                  ],
+                );
+              }
+              return Row(children: [label, const Spacer(), actions]);
+            },
           ),
           SizedBox(
             height: 82,
@@ -664,9 +764,7 @@ class _GifRecorderScreenState extends State<GifRecorderScreen> {
             ),
             const SizedBox(height: 18),
             FilledButton.icon(
-              onPressed: _frames.isNotEmpty && !_recording && !_exporting
-                  ? _exportGif
-                  : null,
+              onPressed: _frames.isNotEmpty && !_locked ? _exportGif : null,
               icon: _exporting
                   ? const SizedBox(
                       width: 17,

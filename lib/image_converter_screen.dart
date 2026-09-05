@@ -249,25 +249,19 @@ class _ImageConverterScreenState extends State<ImageConverterScreen> {
   }
 
   Widget _buildHeader() {
-    return Row(
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '图片格式转换',
-                style: Theme.of(context).textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                '主流格式批量转换 · HEIC/RAW 输入 · 尺寸与文件大小控制 · 全程本地处理',
-                style: TextStyle(color: Color(0xFF667085)),
-              ),
-            ],
-          ),
+        Text(
+          '图片格式转换',
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
+      ],
+    );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         OutlinedButton.icon(
           onPressed: _working ? null : _addFolder,
           icon: const Icon(Icons.folder_open_rounded),
@@ -281,6 +275,23 @@ class _ImageConverterScreenState extends State<ImageConverterScreen> {
         ),
       ],
     );
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth < 650
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerRight, child: actions),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: title),
+                actions,
+              ],
+            ),
+    );
   }
 
   Widget _buildFilePanel() {
@@ -291,11 +302,14 @@ class _ImageConverterScreenState extends State<ImageConverterScreen> {
             padding: const EdgeInsets.fromLTRB(18, 15, 10, 12),
             child: Row(
               children: [
-                Text(
-                  '待转换文件（${_items.length}）',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                Expanded(
+                  child: Text(
+                    '待转换文件（${_items.length}）',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
-                const Spacer(),
                 TextButton(
                   onPressed: _working || _items.isEmpty
                       ? null
@@ -335,11 +349,6 @@ class _ImageConverterScreenState extends State<ImageConverterScreen> {
           const Text(
             '还没有待转换的图片',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            '可添加单张、多张，或扫描整个文件夹（最多 1000 张）',
-            style: TextStyle(color: Color(0xFF667085)),
           ),
           const SizedBox(height: 18),
           FilledButton(onPressed: _addFiles, child: const Text('选择图片')),

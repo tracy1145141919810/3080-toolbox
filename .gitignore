@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/windows/runtime/layout_ocr/
+/windows/runtime/translation/
 
 # Symbolication related
 app.*.symbols

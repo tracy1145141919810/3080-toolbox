@@ -211,7 +211,7 @@ class ImageConversionService {
         '-resize',
         '${settings.width > 0 ? settings.width : ''}x'
             '${settings.height > 0 ? settings.height : ''}'
-            '${settings.keepAspectRatio ? '>' : '!'}',
+            '${settings.keepAspectRatio ? '' : '!'}',
       ],
       if (!settings.keepMetadata) '-strip',
       if (settings.format.lossy) ...['-quality', '$quality'],

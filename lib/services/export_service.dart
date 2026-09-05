@@ -38,7 +38,11 @@ class ExportService {
       height: settings.height,
       numChannels: 3,
     );
-    img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+    final background = settings.backgroundColor;
+    img.fill(
+      canvas,
+      color: img.ColorRgb8(background.red, background.green, background.blue),
+    );
 
     final scale = settings.resizeMode == ResizeMode.cover
         ? _max(settings.width / source.width, settings.height / source.height)

@@ -16,9 +16,29 @@ import 'services/qr_scanner_service.dart';
 import 'services/screen_capture_service.dart';
 import 'services/yolo_segmentation_service.dart';
 import 'toolbox_shell.dart';
+import 'local_translation_screen.dart';
+import 'services/local_translation_service.dart';
+import 'theme/app_typography.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (args.isNotEmpty && args.first == '--translate-demo') {
+    runApp(
+      Toolbox3080App(
+        homeOverride: LocalTranslationScreen(
+          initialImagePath: args.length > 1 && args[1] != '-' ? args[1] : null,
+          translator: args.length > 3
+              ? LocalTranslationService(
+                  runtimeDirectory: args[2],
+                  modelPath: args[3],
+                )
+              : null,
+          reportPath: args.length > 4 ? args[4] : null,
+        ),
+      ),
+    );
+    return;
+  }
   if (args.length == 3 && args.first == '--heic-decode-test') {
     await _runHeicDecodeTest(args[1], args[2]);
     return;
@@ -58,6 +78,10 @@ Future<void> main(List<String> args) async {
   runApp(
     Toolbox3080App(
       initialPage: switch (args) {
+        ['--screen-translation'] => ToolboxPage.screenTranslation,
+        ['--show-portrait'] => ToolboxPage.portraitBackground,
+        ['--show-image-converter'] => ToolboxPage.imageConverter,
+        ['--show-gif-recorder'] => ToolboxPage.gifRecorder,
         ['--show-hardware'] => ToolboxPage.hardwareDetection,
         ['--show-input-tester'] => ToolboxPage.inputTester,
         ['--show-qr-scanner'] => ToolboxPage.qrScanner,
@@ -351,9 +375,14 @@ Future<void> _runSmokeTest(String inputPath, String outputPath) async {
 }
 
 class Toolbox3080App extends StatelessWidget {
-  const Toolbox3080App({super.key, this.initialPage = ToolboxPage.home});
+  const Toolbox3080App({
+    super.key,
+    this.initialPage = ToolboxPage.home,
+    this.homeOverride,
+  });
 
   final ToolboxPage initialPage;
+  final Widget? homeOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +398,8 @@ class Toolbox3080App extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         scaffoldBackgroundColor: const Color(0xFFF7F8FA),
-        fontFamilyFallback: const ['Microsoft YaHei UI', 'Segoe UI'],
+        fontFamily: 'ToolboxCJK',
+        textTheme: const TextTheme(labelLarge: toolboxControlTextStyle),
         useMaterial3: true,
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -394,7 +424,8 @@ class Toolbox3080App extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+            textStyle: toolboxControlTextStyle,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -403,11 +434,17 @@ class Toolbox3080App extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+            textStyle: toolboxControlTextStyle,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           ),
         ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(textStyle: toolboxControlTextStyle),
+        ),
       ),
-      home: ToolboxShell(initialPage: initialPage),
+      home: homeOverride == null
+          ? ToolboxShell(initialPage: initialPage)
+          : Scaffold(body: homeOverride),
     );
   }
 }

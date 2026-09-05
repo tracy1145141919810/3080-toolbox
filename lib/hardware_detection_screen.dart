@@ -198,11 +198,6 @@ class _HardwareDetectionScreenState extends State<HardwareDetectionScreen> {
           style: Theme.of(context).textTheme.headlineSmall
               ?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 5),
-        const Text(
-          '读取本机硬件与 Windows 系统信息 · 无需联网 · 不修改系统设置',
-          style: TextStyle(color: Color(0xFF667085)),
-        ),
       ],
     );
     final actions = Wrap(
@@ -254,7 +249,7 @@ class _HardwareDetectionScreenState extends State<HardwareDetectionScreen> {
     return const _StatePanel(
       icon: Icons.memory_rounded,
       title: '正在读取本机硬件信息',
-      description: '通常需要数秒，检测过程不会上传数据或修改系统设置。',
+      description: '请稍候',
       loading: true,
     );
   }
@@ -412,10 +407,7 @@ class _HardwareDetectionScreenState extends State<HardwareDetectionScreen> {
         .where((item) => item.label.startsWith('内存条'))
         .map((item) => item.value)
         .join(' + ');
-    var gpu = values('gpu');
-    if (snapshot.hasRtx3080) {
-      gpu = '老牧师3080';
-    }
+    final gpuItems = snapshot.section('gpu')?.items ?? [];
     return [
       _HardwareDetailRow('处理器', '$cpu · $cores'),
       _HardwareDetailRow('主板', board.trim()),
@@ -423,7 +415,24 @@ class _HardwareDetectionScreenState extends State<HardwareDetectionScreen> {
         '内存',
         modules == null || modules.isEmpty ? memory : '$memory（$modules）',
       ),
-      _HardwareDetailRow('显卡', gpu, highlight: snapshot.hasRtx3080),
+      if (gpuItems.isEmpty) const _HardwareDetailRow('显卡', '未知'),
+      for (final item in gpuItems)
+        _HardwareDetailRow(
+          item.label,
+          RegExp(r'^显卡 \d+$').hasMatch(item.label) &&
+                  RegExp(
+                    r'RTX\s*3080\b',
+                    caseSensitive: false,
+                  ).hasMatch(item.value)
+              ? '老牧师3080'
+              : item.value,
+          highlight:
+              RegExp(r'^显卡 \d+$').hasMatch(item.label) &&
+              RegExp(
+                r'RTX\s*3080\b',
+                caseSensitive: false,
+              ).hasMatch(item.value),
+        ),
       _HardwareDetailRow('显示器', values('monitor')),
       _HardwareDetailRow('磁盘', values('storage', physicalOnly: true)),
       _HardwareDetailRow('声卡', values('audio')),

@@ -30,7 +30,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   QrScanPayload? _payload;
   bool _busy = false;
   String? _error;
-  String _status = '等待扫描 · 可直接框选屏幕上的二维码或导入图片';
+  String _status = '等待扫描';
 
   Future<String?> _pickImage() async {
     const group = XTypeGroup(
@@ -158,8 +158,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ],
                   const SizedBox(height: 18),
                   if (_payload == null) _buildWelcome() else _buildScanResult(),
-                  const SizedBox(height: 18),
-                  _buildPrivacyNotice(),
                 ],
               ),
             );
@@ -177,11 +175,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           '二维码扫描',
           style: Theme.of(context).textTheme.headlineSmall
               ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 5),
-        const Text(
-          '框选屏幕或导入图片，立即在本机识别二维码内容',
-          style: TextStyle(color: Color(0xFF667085)),
         ),
       ],
     );
@@ -271,14 +264,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ),
             ),
           ),
-          const Text(
-            '完全离线',
-            style: TextStyle(
-              color: Color(0xFF027A48),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ],
       ),
     );
@@ -297,111 +282,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
   }
 
-  Widget _buildWelcome() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          final illustration = Container(
-            width: compact ? double.infinity : 310,
-            height: 250,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFEFF6FF), Color(0xFFF5F3FF)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.qr_code_2_rounded,
-                size: 154,
-                color: Color(0xFF2563EB),
-              ),
-            ),
-          );
-          const guide = Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '两种快速扫描方式',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-                ),
-                SizedBox(height: 20),
-                _GuideStep(
-                  number: '1',
-                  title: '扫描屏幕二维码',
-                  description: '工具箱自动隐藏后，拖动鼠标框住网页、视频或聊天窗口中的二维码。',
-                ),
-                SizedBox(height: 18),
-                _GuideStep(
-                  number: '2',
-                  title: '导入本地图片',
-                  description: '支持 PNG、JPG、BMP、WebP 和 GIF，可一次识别图片中的多个二维码。',
-                ),
-                SizedBox(height: 18),
-                _GuideStep(
-                  number: '3',
-                  title: '复制或安全打开',
-                  description: '结果不会自动执行；你可以检查内容后复制，HTTP/HTTPS 链接可手动打开。',
-                ),
-              ],
-            ),
-          );
-          if (compact) {
-            return Column(
-              children: [
-                illustration,
-                const SizedBox(height: 24),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '两种快速扫描方式',
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    _GuideStep(
-                      number: '1',
-                      title: '扫描屏幕二维码',
-                      description: '工具箱自动隐藏后，拖动鼠标框住屏幕上的二维码。',
-                    ),
-                    SizedBox(height: 18),
-                    _GuideStep(
-                      number: '2',
-                      title: '导入本地图片',
-                      description: '支持常见图片格式，并可识别多个二维码。',
-                    ),
-                    SizedBox(height: 18),
-                    _GuideStep(
-                      number: '3',
-                      title: '检查识别结果',
-                      description: '确认内容后再复制或打开链接，不会自动执行。',
-                    ),
-                  ],
-                ),
-              ],
-            );
-          }
-          return Row(
-            children: [illustration, const SizedBox(width: 34), guide],
-          );
-        },
-      ),
-    );
-  }
+  Widget _buildWelcome() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(40),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFE4E7EC)),
+    ),
+    child: const Center(child: Text('暂无识别结果')),
+  );
 
   Widget _buildScanResult() {
     final payload = _payload!;
@@ -487,85 +377,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 ],
               ],
             ),
-    );
-  }
-
-  Widget _buildPrivacyNotice() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFECFDF3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFABEFC6)),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.shield_outlined, color: Color(0xFF067647)),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '图片与识别内容只在本机内存中处理，不上传服务器。程序不会自动打开或执行二维码内容。',
-              style: TextStyle(
-                color: Color(0xFF067647),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GuideStep extends StatelessWidget {
-  const _GuideStep({
-    required this.number,
-    required this.title,
-    required this.description,
-  });
-
-  final String number;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFF2563EB),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            number,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: const TextStyle(color: Color(0xFF667085), height: 1.45),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
